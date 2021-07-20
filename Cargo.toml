@@ -1,0 +1,17 @@
+[package]
+name = "zipper"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+byteorder = "1"
+num = "0.4"
+num-traits = "0.2"
+hematite-nbt = "0.5"
+num-derive = "0.3"
+lazy_static = "1"
+rand = "0.8"
+async-trait = "0.1"
