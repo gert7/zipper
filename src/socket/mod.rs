@@ -7,23 +7,23 @@ use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 #[async_trait]
-pub trait Middleware<W: AsyncWrite, R: AsyncRead> {
-    async fn write_packet(writer: &mut Pin<&mut W>, data: &[u8]) -> tokio::io::Result<usize>;
+pub trait Middleware<S: AsyncRead + AsyncWrite> {
+    async fn write_packet(&self, writer: &mut Pin<&mut S>, data: &[u8]) -> tokio::io::Result<usize>;
 
-    async fn read_packet(reader: &mut Pin<&mut R>, buf: &mut [u8]) -> tokio::io::Result<()>;
+    async fn read_packet(&self, reader: &mut Pin<&mut S>, buf: &mut [u8]) -> tokio::io::Result<()>;
 }
 
-type CompressionMiddleware<W, R> = dyn Middleware<W, R>;
+type CompressionMiddleware<S> = dyn Middleware<S>;
 
-type EncryptionMiddleware<W, R> = dyn Middleware<W, R>;
+type EncryptionMiddleware<S> = dyn Middleware<S>;
 
-pub struct McSocket<'a, S: AsyncWrite + AsyncRead, C: Middleware<S, S>, E: Middleware<S, S>> {
+pub struct McSocket<'a, S: AsyncWrite + AsyncRead, C: Middleware<S>, E: Middleware<S>> {
     socket: &'a S,
     compressor: C,
     encryptor: E,
 }
 
-impl<'a, S: AsyncWrite + AsyncRead, C: Middleware<S, S>, E: Middleware<S, S>> McSocket<'a, S, C, E> {
+impl<'a, S: AsyncWrite + AsyncRead, C: Middleware<S>, E: Middleware<S>> McSocket<'a, S, C, E> {
     pub fn new(socket: &'a mut S, compressor: C, encryptor: E) -> McSocket<'a, S, C, E> {
         McSocket {
             socket,
