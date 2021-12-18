@@ -21,6 +21,8 @@ use crate::{
 };
 use packet::{HandshakingPacket, LoginPacket};
 
+const ENCRYPTION_ENABLED: bool = false;
+
 lazy_static! {
     static ref PUBLIC_KEY: Vec<u8> = {
         let mut f = File::open("public.der").unwrap();
@@ -29,6 +31,11 @@ lazy_static! {
         data
     };
     static ref PRIVATE_KEY: String = read_to_string("private.pem").unwrap();
+}
+
+fn buffer_cursor() -> Cursor<Vec<u8>> {
+    let buf: Vec<u8> = Vec::new();
+    Cursor::new(buf)
 }
 
 fn prepare_encryption_request(buf: &mut impl Write) -> Result<()> {
@@ -50,6 +57,10 @@ fn prepare_encryption_request(buf: &mut impl Write) -> Result<()> {
         "Sent encryption request... Public key Length {}",
         PUBLIC_KEY.as_slice().len()
     );
+    Ok(())
+}
+
+fn prepare_login_success(buf: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
@@ -116,9 +127,11 @@ fn handle_client(mut stream: TcpStream) {
                             }
                         }
 
-                        let buf = Vec::new();
-                        let mut cur = Cursor::new(buf);
-                        prepare_encryption_request(&mut cur).ok();
+                        let mut cur = buffer_cursor();
+                        if ENCRYPTION_ENABLED {
+                            prepare_encryption_request(&mut cur).ok();
+                        } else {
+                        }
                         let cur = cur.get_ref();
                         let pid = LoginPacketOut::EncryptionRequest;
                         //send_packet_uncompressed(num::ToPrimitive::to_u8(&pid).unwrap(),

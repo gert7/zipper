@@ -2,8 +2,13 @@ pub mod ext;
 
 use byteorder::{BigEndian as BE, ReadBytesExt, WriteBytesExt};
 use num_traits::PrimInt;
+use std::{
+    borrow::BorrowMut,
+    io::{self, Cursor, Read, Write},
+    pin::Pin,
+    str::{self, Utf8Error},
+};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use std::{borrow::BorrowMut, io::{self, Cursor, Read, Write}, pin::Pin, str::{self, Utf8Error}};
 
 fn i32_to_u32_reinterpret(n: i32) -> u32 {
     unsafe { std::mem::transmute(n) }
@@ -158,7 +163,9 @@ impl VarInt {
         Ok(count)
     }
 
-    pub async fn read_from_async<R: AsyncRead + ?Sized>(mut reader: Pin<&mut R>) -> Result<i32, VarIntError> {
+    pub async fn read_from_async<R: AsyncRead + ?Sized>(
+        mut reader: Pin<&mut R>,
+    ) -> Result<i32, VarIntError> {
         let mut decoded_int: i32 = 0;
         let mut offset = 0;
 
@@ -178,7 +185,10 @@ impl VarInt {
         Ok(decoded_int)
     }
 
-    pub async fn write_to_async<W: AsyncWrite + ?Sized>(mut writer: Pin<&mut W>, value: i32) -> tokio::io::Result<usize> {
+    pub async fn write_to_async<W: AsyncWrite + ?Sized>(
+        mut writer: Pin<&mut W>,
+        value: i32,
+    ) -> tokio::io::Result<usize> {
         let mut value = i32_to_u32_reinterpret(value);
         let mut count = 0;
         loop {
@@ -239,5 +249,30 @@ impl McString {
         count += VarInt::write_to(writer, length as i32)?;
         count += writer.write(string.as_bytes())?;
         Ok(count)
+    }
+}
+
+pub struct McUUID {
+    pub most: u64,
+    pub least: u64,
+}
+
+impl McUUID {
+    pub async fn read_from_async<R: AsyncRead + ?Sized>(
+        mut reader: Pin<&mut R>,
+    ) -> Result<McUUID, io::Error> {
+        let most = reader.read_u64().await?;
+        let least = reader.read_u64().await?;
+        let m = McUUID { most, least };
+        Ok(m)
+    }
+
+    pub async fn write_to_async<W: AsyncWrite + ?Sized>(
+        uuid: &McUUID,
+        mut writer: Pin<&mut W>,
+    ) -> std::io::Result<usize> {
+        writer.write_u64(uuid.most).await.ok();
+        writer.write_u64(uuid.least).await.ok();
+        Ok(16)
     }
 }
