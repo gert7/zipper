@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use async_trait::async_trait;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use super::{CompressionMiddleware, Middleware};
 use crate::mc_types::ext::{McAsyncReadExt, McAsyncWriteExt};
@@ -13,7 +13,11 @@ impl<S> Middleware<S> for McNoCompression
 where
     S: AsyncWrite + AsyncRead + Send,
 {
-    async fn write_packet(&self, writer: &mut Pin<&mut S>, data: &[u8]) -> tokio::io::Result<usize> {
+    async fn write_packet(
+        &self,
+        writer: &mut Pin<&mut S>,
+        data: &[u8],
+    ) -> tokio::io::Result<usize> {
         let mut count = 0;
         let length = data.len();
         count += writer.write_mc_varint(length as i32).await?;
@@ -31,19 +35,40 @@ where
     }
 }
 
+pub struct McZlibCompression;
+
+#[async_trait]
+impl<S> Middleware<S> for McZlibCompression
+where
+    S: AsyncWrite + AsyncRead + Send,
+{
+    async fn write_packet(
+        &self,
+        writer: &mut Pin<&mut S>,
+        data: &[u8],
+    ) -> tokio::io::Result<usize> {
+        let mut count = 0;
+        Ok(count)
+    }
+
+    async fn read_packet(&self, reader: &mut Pin<&mut S>, buf: &mut [u8]) -> tokio::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
-    use tokio::{io::BufWriter, runtime::Handle, task::block_in_place};
     use async_std::task;
+    use tokio::{io::BufWriter, runtime::Handle, task::block_in_place};
 
     use super::*;
 
     #[test]
     fn test_write() {
         let input = vec![0x01 as u8, 0x11, 0x22, 0x33];
-        
+
         let output = Vec::new();
         let output = Cursor::new(output);
         let mut output = BufWriter::new(output);
@@ -51,7 +76,9 @@ mod tests {
         let mw = McNoCompression;
 
         task::block_on(async move {
-            mw.write_packet(&mut Pin::new(&mut output), &input).await.ok();
+            mw.write_packet(&mut Pin::new(&mut output), &input)
+                .await
+                .ok();
             let vecnow = output.buffer();
             assert!(vecnow[0] == 0x04);
             assert!(vecnow[1] == 0x01);
@@ -59,6 +86,5 @@ mod tests {
             assert!(vecnow[3] == 0x22);
             assert!(vecnow[4] == 0x33);
         });
-
     }
 }

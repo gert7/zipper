@@ -28,7 +28,7 @@ lazy_static! {
         f.read_to_end(&mut data).ok();
         data
     };
-    static ref PRIVATE_KEY: String = { read_to_string("private.pem").unwrap() };
+    static ref PRIVATE_KEY: String = read_to_string("private.pem").unwrap();
 }
 
 fn prepare_encryption_request(buf: &mut impl Write) -> Result<()> {
