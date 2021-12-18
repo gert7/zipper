@@ -13,11 +13,13 @@ use std::{
     io::{Cursor, Read, Result, Write},
 };
 
-use std::net::{TcpListener, TcpStream};
+// use std::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener, TcpStream};
 
 use crate::{
     mc_types::ext::{McReadExt, McWriteExt},
     packet::{LoginPacketOut, SocketMode},
+    socket::{compression::McNoCompression, null::McNull, McSocket},
 };
 use packet::{HandshakingPacket, LoginPacket};
 
@@ -82,6 +84,7 @@ fn send_packet_uncompressed(pid: u8, stream: &mut impl Write, buf: &[u8]) -> Res
 
 fn handle_client(mut stream: TcpStream) {
     let stream_m = &mut stream;
+    let socket = McSocket::new(stream_m, McNoCompression, McNull);
     let mut mode = SocketMode::Handshaking;
 
     println!(

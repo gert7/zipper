@@ -1,5 +1,5 @@
-mod compression;
-mod encryption;
+pub mod compression;
+pub mod null;
 
 use std::pin::Pin;
 
@@ -8,7 +8,8 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 #[async_trait]
 pub trait Middleware<S: AsyncRead + AsyncWrite> {
-    async fn write_packet(&self, writer: &mut Pin<&mut S>, data: &[u8]) -> tokio::io::Result<usize>;
+    async fn write_packet(&self, writer: &mut Pin<&mut S>, data: &[u8])
+        -> tokio::io::Result<usize>;
 
     async fn read_packet(&self, reader: &mut Pin<&mut S>, buf: &mut [u8]) -> tokio::io::Result<()>;
 }
@@ -32,11 +33,7 @@ impl<'a, S: AsyncWrite + AsyncRead, C: Middleware<S>, E: Middleware<S>> McSocket
         }
     }
 
-    pub fn write_mc_packet(pid: i32, packet: &[u8]) {
+    pub fn write_mc_packet(pid: i32, packet: &[u8]) {}
 
-    }
-
-    pub fn read_mc_packet() {
-
-    }
+    pub fn read_mc_packet() {}
 }

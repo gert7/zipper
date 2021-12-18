@@ -269,7 +269,7 @@ impl McUUID {
 
     pub async fn write_to_async<W: AsyncWrite + ?Sized>(
         uuid: &McUUID,
-        mut writer: Pin<&mut W>,
+        writer: &mut Pin<&mut W>,
     ) -> std::io::Result<usize> {
         writer.write_u64(uuid.most).await.ok();
         writer.write_u64(uuid.least).await.ok();
