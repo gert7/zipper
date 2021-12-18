@@ -2,7 +2,8 @@ pub mod ext;
 
 use byteorder::{BigEndian as BE, ReadBytesExt, WriteBytesExt};
 use num_traits::PrimInt;
-use std::{io::{self, Cursor, Read, Write}, str::{self, Utf8Error}};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::{borrow::BorrowMut, io::{self, Cursor, Read, Write}, pin::Pin, str::{self, Utf8Error}};
 
 fn i32_to_u32_reinterpret(n: i32) -> u32 {
     unsafe { std::mem::transmute(n) }
@@ -149,6 +150,46 @@ impl VarInt {
             }
 
             writer.write_u8(current_byte)?;
+            count += 1;
+            if value == 0 {
+                break;
+            }
+        }
+        Ok(count)
+    }
+
+    pub async fn read_from_async<R: AsyncRead + ?Sized>(mut reader: Pin<&mut R>) -> Result<i32, VarIntError> {
+        let mut decoded_int: i32 = 0;
+        let mut offset = 0;
+
+        loop {
+            let current_byte = reader.read_u8().await?;
+            decoded_int |= ((current_byte as i32) & 0b01111111) << offset;
+
+            if offset >= 35 {
+                return Err(VarIntError::VarIntTooLong);
+            }
+
+            offset += 7;
+            if (current_byte & 0b10000000) == 0 {
+                break;
+            }
+        }
+        Ok(decoded_int)
+    }
+
+    pub async fn write_to_async<W: AsyncWrite + ?Sized>(mut writer: Pin<&mut W>, value: i32) -> tokio::io::Result<usize> {
+        let mut value = i32_to_u32_reinterpret(value);
+        let mut count = 0;
+        loop {
+            let mut current_byte = (value & 0b01111111) as u8;
+
+            value = value.unsigned_shr(7);
+            if value != 0 {
+                current_byte |= 0b10000000;
+            }
+
+            writer.write_u8(current_byte).await?;
             count += 1;
             if value == 0 {
                 break;

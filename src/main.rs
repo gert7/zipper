@@ -4,6 +4,7 @@ extern crate lazy_static;
 
 mod mc_types;
 mod packet;
+mod socket;
 
 use lazy_static::lazy_static;
 use rand::prelude::*;
