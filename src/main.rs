@@ -11,15 +11,16 @@ use rand::prelude::*;
 use std::{
     fs::{read_to_string, File},
     io::{Cursor, Read, Result, Write},
+    pin::Pin,
 };
 
 // use std::net::{TcpListener, TcpStream};
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::{
-    mc_types::ext::{McReadExt, McWriteExt},
+    mc_types::ext::{McAsyncReadExt, McAsyncWriteExt, McReadExt, McWriteExt},
     packet::{LoginPacketOut, SocketMode},
-    socket::{compression::McNoCompression, null::McNull, McSocket},
+    socket::{compression::McNoCompression, passthrough::McPassthrough, McSocket},
 };
 use packet::{HandshakingPacket, LoginPacket};
 
@@ -82,9 +83,10 @@ fn send_packet_uncompressed(pid: u8, stream: &mut impl Write, buf: &[u8]) -> Res
     Ok(())
 }
 
-fn handle_client(mut stream: TcpStream) {
+async fn handle_client(mut stream: TcpStream) -> Result<()> {
     let stream_m = &mut stream;
-    let socket = McSocket::new(stream_m, McNoCompression, McNull);
+    let stream_m = Pin::new(stream_m);
+    // let socket = McSocket::new(stream_m, McNoCompression, McPassthrough);
     let mut mode = SocketMode::Handshaking;
 
     println!(
@@ -93,18 +95,18 @@ fn handle_client(mut stream: TcpStream) {
     );
 
     loop {
-        let length = stream_m.read_mc_varint().unwrap();
-        let packet_id_u8 = stream_m.read_mc_varint().unwrap() as u8;
+        let length = stream_m.read_mc_varint().await?;
+        let packet_id_u8 = stream_m.read_mc_varint().await? as u8;
         match mode {
             SocketMode::Handshaking => {
                 let packet_id = num::FromPrimitive::from_u8(packet_id_u8);
                 println!("Length {}, ID {}", length, packet_id_u8);
                 match packet_id {
                     Some(HandshakingPacket::Handshaking) => {
-                        let protocol_version = stream_m.read_mc_varint().unwrap();
-                        let addr = stream_m.read_mc_string().unwrap();
-                        let port = stream_m.read_mc_ushort().unwrap();
-                        let next_state = stream_m.read_mc_varint().unwrap();
+                        let protocol_version = stream_m.read_mc_varint().await?;
+                        let addr = stream_m.read_mc_string().await?;
+                        let port = stream_m.read_mc_ushort().await?;
+                        let next_state = stream_m.read_mc_varint().await?;
 
                         println!(
                             "Version {}, addr {}, port {}, next state {}",
@@ -121,7 +123,7 @@ fn handle_client(mut stream: TcpStream) {
                 println!("Length {}, ID {}", length, packet_id_u8);
                 match packet_id {
                     Some(LoginPacket::LoginStart) => {
-                        let username = stream_m.read_mc_string();
+                        let username = stream_m.read_mc_string().await?;
                         match username {
                             Ok(v) => println!("Username {}", v),
                             Err(e) => {

@@ -1,8 +1,8 @@
-use std::{io, pin::Pin};
 use super::*;
-use byteorder::ReadBytesExt;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use async_trait::async_trait;
+use byteorder::ReadBytesExt;
+use std::{io, pin::Pin};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub trait McReadExt: io::Read {
     fn read_mc_byte(&mut self) -> io::Result<i8> {
@@ -38,12 +38,16 @@ pub trait McReadExt: io::Read {
     }
 
     fn read_mc_varint(&mut self) -> Result<i32, VarIntError>
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         Ok(VarInt::read_from(self)?)
     }
 
     fn read_mc_string(&mut self) -> Result<String, McStringError>
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         Ok(McString::read_from(self)?)
     }
 }
@@ -84,12 +88,16 @@ pub trait McWriteExt: io::Write {
     }
 
     fn write_mc_varint(&mut self, value: i32) -> io::Result<usize>
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         VarInt::write_to(self, value)
     }
 
     fn write_mc_string(&mut self, value: &str) -> io::Result<usize>
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         McString::write_to(value, self)
     }
 }
@@ -122,26 +130,22 @@ pub trait McAsyncReadExt: tokio::io::AsyncRead {
     async fn read_mc_long(self: &mut Pin<&mut Self>) -> tokio::io::Result<i64> {
         self.read_i64().await
     }
-    
+
     async fn read_mc_float(self: &mut Pin<&mut Self>) -> tokio::io::Result<f32> {
         // No floating point in AsyncReadExt
         let fake = self.read_i32().await?;
-        let f = unsafe {
-            std::mem::transmute(fake)
-        };
+        let f = unsafe { std::mem::transmute(fake) };
         Ok(f)
     }
 
     async fn read_mc_double(self: &mut Pin<&mut Self>) -> tokio::io::Result<f64> {
         let fake = self.read_i64().await?;
-        let f = unsafe {
-            std::mem::transmute(fake)
-        };
+        let f = unsafe { std::mem::transmute(fake) };
         Ok(f)
     }
 
-    async fn read_mc_varint(self: &mut Pin<&mut Self>) -> Result<i32, VarIntError> {
-        VarInt::read_from_async(self.as_mut()).await
+    async fn read_mc_varint(self: &mut Pin<&mut Self>) -> tokio::io::Result<i32> {
+        Ok(VarInt::read_from_async(self.as_mut()).await.unwrap())
     }
 }
 
@@ -157,12 +161,12 @@ pub trait McAsyncWriteExt: tokio::io::AsyncWrite {
         self.write_u8(value).await
     }
 
-    async fn write_mc_short(self: &mut  Pin<&mut Self>, value: i16) -> tokio::io::Result<()> {
+    async fn write_mc_short(self: &mut Pin<&mut Self>, value: i16) -> tokio::io::Result<()> {
         // NOTE: reads are BIG ENDIAN
         self.write_i16(value).await
     }
 
-    async fn write_mc_ushort(self: &mut  Pin<&mut Self>, value: u16) -> tokio::io::Result<()> {
+    async fn write_mc_ushort(self: &mut Pin<&mut Self>, value: u16) -> tokio::io::Result<()> {
         self.write_u16(value).await
     }
 
@@ -173,18 +177,14 @@ pub trait McAsyncWriteExt: tokio::io::AsyncWrite {
     async fn write_mc_long(self: &mut Pin<&mut Self>, value: i64) -> tokio::io::Result<()> {
         self.write_i64(value).await
     }
-    
+
     async fn write_mc_float(self: &mut Pin<&mut Self>, value: f32) -> tokio::io::Result<()> {
-        let fake = unsafe {
-            std::mem::transmute(value)
-        };
+        let fake = unsafe { std::mem::transmute(value) };
         self.write_i32(fake).await
     }
 
     async fn write_mc_double(self: &mut Pin<&mut Self>, value: f64) -> tokio::io::Result<()> {
-        let fake = unsafe {
-            std::mem::transmute(value)
-        };
+        let fake = unsafe { std::mem::transmute(value) };
         self.write_i64(fake).await
     }
 

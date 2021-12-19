@@ -1,5 +1,5 @@
 pub mod compression;
-pub mod null;
+pub mod passthrough;
 
 use std::pin::Pin;
 

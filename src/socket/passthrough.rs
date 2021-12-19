@@ -7,10 +7,10 @@ use super::Middleware;
 
 /** Reads and writes without modification
  */
-pub struct McNull;
+pub struct McPassthrough;
 
 #[async_trait]
-impl<S> Middleware<S> for McNull
+impl<S> Middleware<S> for McPassthrough
 where
     S: AsyncWrite + AsyncRead + Send,
 {

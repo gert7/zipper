@@ -6,6 +6,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use super::{CompressionMiddleware, Middleware};
 use crate::mc_types::ext::{McAsyncReadExt, McAsyncWriteExt};
 
+/// Prepends the length of the data in front of the data before writing.
 pub struct McNoCompression;
 
 #[async_trait]
@@ -48,6 +49,7 @@ where
         data: &[u8],
     ) -> tokio::io::Result<usize> {
         let mut count = 0;
+        // TODO
         Ok(count)
     }
 
@@ -58,20 +60,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use async_std::task;
-    use tokio::{io::BufWriter, runtime::Handle, task::block_in_place};
-
     use super::*;
+    use async_std::task;
+    use std::io::Cursor;
 
     #[test]
     fn test_write() {
         let input = vec![0x01 as u8, 0x11, 0x22, 0x33];
 
         let output = Vec::new();
-        let output = Cursor::new(output);
-        let mut output = BufWriter::new(output);
+        let mut output = Cursor::new(output);
 
         let mw = McNoCompression;
 
@@ -79,7 +77,7 @@ mod tests {
             mw.write_packet(&mut Pin::new(&mut output), &input)
                 .await
                 .ok();
-            let vecnow = output.buffer();
+            let vecnow = output.get_ref();
             assert!(vecnow[0] == 0x04);
             assert!(vecnow[1] == 0x01);
             assert!(vecnow[2] == 0x11);
