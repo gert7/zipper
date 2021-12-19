@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use rand::prelude::*;
 use std::{
     fs::{read_to_string, File},
-    io::{Cursor, Read, Result, Write},
+    io::{self, Cursor, Read, Result, Write},
     pin::Pin,
 };
 
@@ -83,7 +83,7 @@ fn send_packet_uncompressed(pid: u8, stream: &mut impl Write, buf: &[u8]) -> Res
     Ok(())
 }
 
-async fn handle_client(mut stream: TcpStream) -> Result<()> {
+async fn handle_client(mut stream: TcpStream) -> io::Result<()> {
     let stream_m = &mut stream;
     let stream_m = Pin::new(stream_m);
     // let socket = McSocket::new(stream_m, McNoCompression, McPassthrough);
@@ -154,7 +154,7 @@ async fn handle_client(mut stream: TcpStream) -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 async fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:25565")?;
+    let listener = TcpListener::bind("127.0.0.1:25565").await?;
 
     println!("Continued");
 

@@ -138,13 +138,13 @@ pub trait McAsyncReadExt: tokio::io::AsyncRead {
         Ok(f)
     }
 
-    async fn read_mc_double(self: &mut Pin<&mut Self>) -> tokio::io::Result<f64> {
+    async fn read_mc_double(self: &mut Pin<&mut Self>) -> io::Result<f64> {
         let fake = self.read_i64().await?;
         let f = unsafe { std::mem::transmute(fake) };
         Ok(f)
     }
 
-    async fn read_mc_varint(self: &mut Pin<&mut Self>) -> tokio::io::Result<i32> {
+    async fn read_mc_varint(self: &mut Pin<&mut Self>) -> io::Result<i32> {
         Ok(VarInt::read_from_async(self.as_mut()).await.unwrap())
     }
 }

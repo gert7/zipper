@@ -4,7 +4,7 @@ use byteorder::{BigEndian as BE, ReadBytesExt, WriteBytesExt};
 use num_traits::PrimInt;
 use std::{
     borrow::BorrowMut,
-    io::{self, Cursor, Read, Write},
+    io::{self, Cursor, ErrorKind, Read, Write},
     pin::Pin,
     str::{self, Utf8Error},
 };
@@ -116,9 +116,27 @@ pub enum VarIntError {
     Io(io::Error),
 }
 
+impl VarIntError {
+    fn to_string(&self) -> &str {
+        match self {
+            VarIntError::VarIntTooLong => "VarInt is too long",
+            VarIntError::Io(_) => "IO error found!",
+        }
+    }
+}
+
 impl From<io::Error> for VarIntError {
     fn from(e: io::Error) -> Self {
         VarIntError::Io(e)
+    }
+}
+
+impl From<VarIntError> for io::Error {
+    fn from(e: VarIntError) -> Self {
+        match e {
+            VarIntError::VarIntTooLong => io::Error::new(ErrorKind::Other, "VarInt too long"),
+            VarIntError::Io(v) => v,
+        }
     }
 }
 
@@ -227,6 +245,16 @@ impl From<VarIntError> for McStringError {
 impl From<io::Error> for McStringError {
     fn from(e: io::Error) -> Self {
         McStringError::Io(e)
+    }
+}
+
+impl From<McStringError> for io::Error {
+    fn from(e: McStringError) -> Self {
+        match e {
+            McStringError::VarIntError(_) => io::Error::new(ErrorKind::Other, "VarInt Error"),
+            McStringError::Io(v) => v,
+            McStringError::Utf8(_) => io::Error::new(ErrorKind::InvalidData, "UTF-8 coding error"),
+        }
     }
 }
 
