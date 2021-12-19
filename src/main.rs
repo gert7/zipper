@@ -15,7 +15,10 @@ use std::{
 };
 
 // use std::net::{TcpListener, TcpStream};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    io::{AsyncWrite, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 
 use crate::{
     mc_types::ext::{McAsyncReadExt, McAsyncWriteExt, McReadExt, McWriteExt},
@@ -67,18 +70,21 @@ fn prepare_login_success(buf: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-fn send_packet_uncompressed(pid: u8, stream: &mut impl Write, buf: &[u8]) -> Result<()> {
+async fn send_packet_uncompressed<S>(pid: u8, stream: &mut Pin<&mut S>, buf: &[u8]) -> Result<()>
+where
+    S: AsyncWrite + Send,
+{
     let mut f = File::create("hello.txt").unwrap();
 
-    stream.write_mc_varint((buf.len() + 1) as i32)?;
+    stream.write_mc_varint((buf.len() + 1) as i32).await?;
     f.write_mc_varint((buf.len() + 1) as i32)?;
 
     println!("Buffer length {}", buf.len());
 
-    stream.write_mc_varint(pid as i32)?;
+    stream.write_mc_varint(pid as i32).await?;
     f.write_mc_varint(pid as i32)?;
 
-    stream.write(buf)?;
+    stream.write(buf).await?;
     f.write(buf)?;
     Ok(())
 }
@@ -140,7 +146,7 @@ async fn handle_client(mut stream: TcpStream) -> io::Result<()> {
                         let cur = cur.get_ref();
                         let pid = LoginPacketOut::EncryptionRequest;
                         //send_packet_uncompressed(num::ToPrimitive::to_u8(&pid).unwrap(),
-                        send_packet_uncompressed(0x01, stream_m, cur).unwrap();
+                        send_packet_uncompressed(0x01, &mut stream_m, cur).await?;
                     }
                     Some(LoginPacket::EncryptionResponse) => {}
                     Some(LoginPacket::LoginPluginResponse) => {}

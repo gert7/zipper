@@ -145,7 +145,7 @@ pub trait McAsyncReadExt: tokio::io::AsyncRead {
     }
 
     async fn read_mc_varint(self: &mut Pin<&mut Self>) -> io::Result<i32> {
-        Ok(VarInt::read_from_async(self.as_mut()).await.unwrap())
+        Ok(VarInt::read_from_async(self).await.unwrap())
     }
 }
 
@@ -189,7 +189,7 @@ pub trait McAsyncWriteExt: tokio::io::AsyncWrite {
     }
 
     async fn write_mc_varint(self: &mut Pin<&mut Self>, value: i32) -> tokio::io::Result<usize> {
-        VarInt::write_to_async(self.as_mut(), value).await
+        VarInt::write_to_async(self, value).await
     }
 }
 

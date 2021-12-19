@@ -182,7 +182,7 @@ impl VarInt {
     }
 
     pub async fn read_from_async<R: AsyncRead + ?Sized>(
-        mut reader: Pin<&mut R>,
+        reader: &mut Pin<&mut R>,
     ) -> Result<i32, VarIntError> {
         let mut decoded_int: i32 = 0;
         let mut offset = 0;
@@ -204,7 +204,7 @@ impl VarInt {
     }
 
     pub async fn write_to_async<W: AsyncWrite + ?Sized>(
-        mut writer: Pin<&mut W>,
+        writer: &mut Pin<&mut W>,
         value: i32,
     ) -> tokio::io::Result<usize> {
         let mut value = i32_to_u32_reinterpret(value);
@@ -277,6 +277,20 @@ impl McString {
         count += VarInt::write_to(writer, length as i32)?;
         count += writer.write(string.as_bytes())?;
         Ok(count)
+    }
+
+    pub async fn read_from_async<R: AsyncRead + ?Sized>(
+        reader: &mut Pin<&mut R>,
+    ) -> Result<String, McStringError> {
+        let length = VarInt::read_from_async(reader).await? as usize;
+        let mut buffer: Vec<u8> = vec![0; length];
+        reader.read_exact(buffer.as_mut()).await;
+
+        let s = match str::from_utf8(&buffer) {
+            Ok(v) => v,
+            Err(u8err) => return Err(McStringError::Utf8(u8err)),
+        };
+        Ok(s.to_owned())
     }
 }
 
