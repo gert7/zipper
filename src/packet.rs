@@ -26,3 +26,13 @@ pub enum LoginPacketOut {
     EncryptionRequest = 0x01,
     LoginSuccess = 0x02,
 }
+
+#[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[repr(i8)]
+pub enum GameMode {
+    NoPreviousGameMode = -1,
+    Survival = 0,
+    Creative = 1,
+    Adventure = 2,
+    Spectator = 3,
+}

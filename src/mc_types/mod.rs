@@ -5,6 +5,7 @@ use num_traits::PrimInt;
 use std::{
     borrow::BorrowMut,
     io::{self, Cursor, ErrorKind, Read, Write},
+    ops::Add,
     pin::Pin,
     str::{self, Utf8Error},
 };
@@ -234,6 +235,7 @@ pub enum McStringError {
     VarIntError(VarIntError),
     Io(io::Error),
     Utf8(Utf8Error),
+    LengthMismatch,
 }
 
 impl From<VarIntError> for McStringError {
@@ -254,6 +256,9 @@ impl From<McStringError> for io::Error {
             McStringError::VarIntError(_) => io::Error::new(ErrorKind::Other, "VarInt Error"),
             McStringError::Io(v) => v,
             McStringError::Utf8(_) => io::Error::new(ErrorKind::InvalidData, "UTF-8 coding error"),
+            McStringError::LengthMismatch => {
+                io::Error::new(ErrorKind::InvalidData, "String length mismatch")
+            }
         }
     }
 }
@@ -271,7 +276,7 @@ impl McString {
         Ok(s.to_owned())
     }
 
-    pub fn write_to(string: &str, writer: &mut impl Write) -> std::io::Result<usize> {
+    pub fn write_to(writer: &mut impl Write, string: &str) -> io::Result<usize> {
         let length = string.len();
         let mut count = 0;
         count += VarInt::write_to(writer, length as i32)?;
@@ -284,13 +289,61 @@ impl McString {
     ) -> Result<String, McStringError> {
         let length = VarInt::read_from_async(reader).await? as usize;
         let mut buffer: Vec<u8> = vec![0; length];
-        reader.read_exact(buffer.as_mut()).await;
+        let actual_len = reader.read_exact(buffer.as_mut()).await?;
+
+        if actual_len < length {
+            return Err(McStringError::LengthMismatch);
+        }
 
         let s = match str::from_utf8(&buffer) {
             Ok(v) => v,
             Err(u8err) => return Err(McStringError::Utf8(u8err)),
         };
         Ok(s.to_owned())
+    }
+
+    pub async fn write_to_async<W: AsyncWrite + ?Sized>(
+        writer: &mut Pin<&mut W>,
+        string: &str,
+    ) -> io::Result<usize> {
+        let length = string.len();
+        let mut count = 0;
+        count += VarInt::write_to_async(writer, length as i32).await?;
+        count += writer.write(string.as_bytes()).await?;
+        Ok(count)
+    }
+}
+
+pub struct McIdentifier {
+    pub namespace: Option<String>,
+    pub name: String,
+}
+
+impl McIdentifier {
+    fn from_string(string: &str) -> Result<McIdentifier, McStringError> {
+        let mut split = string.split(':');
+        let first = split.next().ok_or(McStringError::LengthMismatch)?;
+        let second = split.next();
+        Ok(McIdentifier {
+            namespace: if second.is_some() {
+                Some(first.to_owned())
+            } else {
+                None
+            },
+            name: second.unwrap_or(first).to_owned(),
+        })
+    }
+
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        if self.namespace.is_some() {
+            s.push_str(self.namespace.as_ref().unwrap().as_str());
+        } else {
+            s.push_str("minecraft");
+        }
+        s.push(':');
+        s.push_str(&self.name);
+        s
     }
 }
 
@@ -300,9 +353,22 @@ pub struct McUUID {
 }
 
 impl McUUID {
+    pub fn read_from(reader: &mut impl Read) -> io::Result<McUUID> {
+        let most = reader.read_u64::<BE>()?;
+        let least = reader.read_u64::<BE>()?;
+        let m = McUUID { most, least };
+        Ok(m)
+    }
+
+    pub fn write_to(writer: &mut impl Write, uuid: &McUUID) -> io::Result<usize> {
+        writer.write_u64::<BE>(uuid.most)?;
+        writer.write_u64::<BE>(uuid.least)?;
+        Ok(16)
+    }
+
     pub async fn read_from_async<R: AsyncRead + ?Sized>(
-        mut reader: Pin<&mut R>,
-    ) -> Result<McUUID, io::Error> {
+        reader: &mut Pin<&mut R>,
+    ) -> io::Result<McUUID> {
         let most = reader.read_u64().await?;
         let least = reader.read_u64().await?;
         let m = McUUID { most, least };
@@ -310,9 +376,9 @@ impl McUUID {
     }
 
     pub async fn write_to_async<W: AsyncWrite + ?Sized>(
-        uuid: &McUUID,
         writer: &mut Pin<&mut W>,
-    ) -> std::io::Result<usize> {
+        uuid: &McUUID,
+    ) -> io::Result<usize> {
         writer.write_u64(uuid.most).await.ok();
         writer.write_u64(uuid.least).await.ok();
         Ok(16)

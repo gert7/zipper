@@ -5,6 +5,11 @@ use std::{io, pin::Pin};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub trait McReadExt: io::Read {
+    fn read_mc_bool(&mut self) -> io::Result<bool> {
+        let is_false = self.read_i8()? == 0x00;
+        Ok(!is_false)
+    }
+
     fn read_mc_byte(&mut self) -> io::Result<i8> {
         self.read_i8()
     }
@@ -50,41 +55,69 @@ pub trait McReadExt: io::Read {
     {
         Ok(McString::read_from(self)?)
     }
+
+    fn read_mc_identifier(&mut self) -> Result<McIdentifier, McStringError>
+    where
+        Self: Sized,
+    {
+        let string = self.read_mc_string()?;
+        McIdentifier::from_string(&string)
+    }
+
+    fn read_mc_uuid(&mut self) -> Result<McUUID, io::Error>
+    where
+        Self: Sized,
+    {
+        Ok(McUUID::read_from(self)?)
+    }
 }
 
 impl<R: io::Read + ?Sized> McReadExt for R {}
 
 pub trait McWriteExt: io::Write {
-    fn write_mc_byte(&mut self, value: i8) -> io::Result<()> {
-        self.write_i8(value)
+    fn write_mc_bool(&mut self, value: bool) -> io::Result<usize> {
+        self.write_i8(if value { 0x01 } else { 0x00 })?;
+        Ok(1)
     }
 
-    fn write_mc_ubyte(&mut self, value: u8) -> io::Result<()> {
-        self.write_u8(value)
+    fn write_mc_byte(&mut self, value: i8) -> io::Result<usize> {
+        self.write_i8(value)?;
+        Ok(1)
     }
 
-    fn write_mc_short(&mut self, value: i16) -> io::Result<()> {
-        self.write_i16::<BE>(value)
+    fn write_mc_ubyte(&mut self, value: u8) -> io::Result<usize> {
+        self.write_u8(value)?;
+        Ok(1)
     }
 
-    fn write_mc_ushort(&mut self, value: u16) -> io::Result<()> {
-        self.write_u16::<BE>(value)
+    fn write_mc_short(&mut self, value: i16) -> io::Result<usize> {
+        self.write_i16::<BE>(value)?;
+        Ok(2)
     }
 
-    fn write_mc_int(&mut self, value: i32) -> io::Result<()> {
-        self.write_i32::<BE>(value)
+    fn write_mc_ushort(&mut self, value: u16) -> io::Result<usize> {
+        self.write_u16::<BE>(value)?;
+        Ok(2)
     }
 
-    fn write_mc_long(&mut self, value: i64) -> io::Result<()> {
-        self.write_i64::<BE>(value)
+    fn write_mc_int(&mut self, value: i32) -> io::Result<usize> {
+        self.write_i32::<BE>(value)?;
+        Ok(4)
     }
 
-    fn write_mc_float(&mut self, value: f32) -> io::Result<()> {
-        self.write_f32::<BE>(value)
+    fn write_mc_long(&mut self, value: i64) -> io::Result<usize> {
+        self.write_i64::<BE>(value)?;
+        Ok(8)
     }
 
-    fn write_mc_double(&mut self, value: f64) -> io::Result<()> {
-        self.write_f64::<BE>(value)
+    fn write_mc_float(&mut self, value: f32) -> io::Result<usize> {
+        self.write_f32::<BE>(value)?;
+        Ok(4)
+    }
+
+    fn write_mc_double(&mut self, value: f64) -> io::Result<usize> {
+        self.write_f64::<BE>(value)?;
+        Ok(8)
     }
 
     fn write_mc_varint(&mut self, value: i32) -> io::Result<usize>
@@ -98,7 +131,22 @@ pub trait McWriteExt: io::Write {
     where
         Self: Sized,
     {
-        McString::write_to(value, self)
+        McString::write_to(self, value)
+    }
+
+    fn write_mc_identifier(&mut self, value: &McIdentifier) -> io::Result<usize>
+    where
+        Self: Sized,
+    {
+        let string = value.to_string();
+        McString::write_to(self, &string)
+    }
+
+    fn write_mc_uuid(&mut self, value: &McUUID) -> io::Result<usize>
+    where
+        Self: Sized,
+    {
+        McUUID::write_to(self, value)
     }
 }
 
@@ -106,32 +154,37 @@ impl<W: io::Write + ?Sized> McWriteExt for W {}
 
 #[async_trait]
 pub trait McAsyncReadExt: tokio::io::AsyncRead {
-    async fn read_mc_byte(self: &mut Pin<&mut Self>) -> tokio::io::Result<i8> {
+    async fn read_mc_bool(self: &mut Pin<&mut Self>) -> io::Result<bool> {
+        let is_false = self.read_i8().await? == 0x00;
+        Ok(!is_false)
+    }
+
+    async fn read_mc_byte(self: &mut Pin<&mut Self>) -> io::Result<i8> {
         self.read_i8().await
     }
 
-    async fn read_mc_ubyte(self: &mut Pin<&mut Self>) -> tokio::io::Result<u8> {
+    async fn read_mc_ubyte(self: &mut Pin<&mut Self>) -> io::Result<u8> {
         self.read_u8().await
     }
 
-    async fn read_mc_short(self: &mut Pin<&mut Self>) -> tokio::io::Result<i16> {
+    async fn read_mc_short(self: &mut Pin<&mut Self>) -> io::Result<i16> {
         // NOTE: reads are BIG ENDIAN
         self.read_i16().await
     }
 
-    async fn read_mc_ushort(self: &mut Pin<&mut Self>) -> tokio::io::Result<u16> {
+    async fn read_mc_ushort(self: &mut Pin<&mut Self>) -> io::Result<u16> {
         self.read_u16().await
     }
 
-    async fn read_mc_int(self: &mut Pin<&mut Self>) -> tokio::io::Result<i32> {
+    async fn read_mc_int(self: &mut Pin<&mut Self>) -> io::Result<i32> {
         self.read_i32().await
     }
 
-    async fn read_mc_long(self: &mut Pin<&mut Self>) -> tokio::io::Result<i64> {
+    async fn read_mc_long(self: &mut Pin<&mut Self>) -> io::Result<i64> {
         self.read_i64().await
     }
 
-    async fn read_mc_float(self: &mut Pin<&mut Self>) -> tokio::io::Result<f32> {
+    async fn read_mc_float(self: &mut Pin<&mut Self>) -> io::Result<f32> {
         // No floating point in AsyncReadExt
         let fake = self.read_i32().await?;
         let f = unsafe { std::mem::transmute(fake) };
@@ -145,7 +198,20 @@ pub trait McAsyncReadExt: tokio::io::AsyncRead {
     }
 
     async fn read_mc_varint(self: &mut Pin<&mut Self>) -> io::Result<i32> {
-        Ok(VarInt::read_from_async(self).await.unwrap())
+        Ok(VarInt::read_from_async(self).await?)
+    }
+
+    async fn read_mc_string(self: &mut Pin<&mut Self>) -> io::Result<String> {
+        Ok(McString::read_from_async(self).await?)
+    }
+
+    async fn read_mc_identifier(self: &mut Pin<&mut Self>) -> io::Result<McIdentifier> {
+        let string = McString::read_from_async(self).await?;
+        Ok(McIdentifier::from_string(&string)?)
+    }
+
+    async fn read_mc_uuid(self: &mut Pin<&mut Self>) -> io::Result<McUUID> {
+        Ok(McUUID::read_from_async(self).await?)
     }
 }
 
@@ -153,43 +219,63 @@ impl<R: tokio::io::AsyncRead + ?Sized> McAsyncReadExt for R {}
 
 #[async_trait]
 pub trait McAsyncWriteExt: tokio::io::AsyncWrite {
-    async fn write_mc_byte(self: &mut Pin<&mut Self>, value: i8) -> tokio::io::Result<()> {
+    async fn write_mc_bool(self: &mut Pin<&mut Self>, value: bool) -> io::Result<()> {
+        self.write_i8(if value { 0x01 } else { 0x00 }).await
+    }
+
+    async fn write_mc_byte(self: &mut Pin<&mut Self>, value: i8) -> io::Result<()> {
         self.write_i8(value).await
     }
 
-    async fn write_mc_ubyte(self: &mut Pin<&mut Self>, value: u8) -> tokio::io::Result<()> {
+    async fn write_mc_ubyte(self: &mut Pin<&mut Self>, value: u8) -> io::Result<()> {
         self.write_u8(value).await
     }
 
-    async fn write_mc_short(self: &mut Pin<&mut Self>, value: i16) -> tokio::io::Result<()> {
+    async fn write_mc_short(self: &mut Pin<&mut Self>, value: i16) -> io::Result<()> {
         // NOTE: reads are BIG ENDIAN
         self.write_i16(value).await
     }
 
-    async fn write_mc_ushort(self: &mut Pin<&mut Self>, value: u16) -> tokio::io::Result<()> {
+    async fn write_mc_ushort(self: &mut Pin<&mut Self>, value: u16) -> io::Result<()> {
         self.write_u16(value).await
     }
 
-    async fn write_mc_int(self: &mut Pin<&mut Self>, value: i32) -> tokio::io::Result<()> {
+    async fn write_mc_int(self: &mut Pin<&mut Self>, value: i32) -> io::Result<()> {
         self.write_i32(value).await
     }
 
-    async fn write_mc_long(self: &mut Pin<&mut Self>, value: i64) -> tokio::io::Result<()> {
+    async fn write_mc_long(self: &mut Pin<&mut Self>, value: i64) -> io::Result<()> {
         self.write_i64(value).await
     }
 
-    async fn write_mc_float(self: &mut Pin<&mut Self>, value: f32) -> tokio::io::Result<()> {
+    async fn write_mc_float(self: &mut Pin<&mut Self>, value: f32) -> io::Result<()> {
         let fake = unsafe { std::mem::transmute(value) };
         self.write_i32(fake).await
     }
 
-    async fn write_mc_double(self: &mut Pin<&mut Self>, value: f64) -> tokio::io::Result<()> {
+    async fn write_mc_double(self: &mut Pin<&mut Self>, value: f64) -> io::Result<()> {
         let fake = unsafe { std::mem::transmute(value) };
         self.write_i64(fake).await
     }
 
-    async fn write_mc_varint(self: &mut Pin<&mut Self>, value: i32) -> tokio::io::Result<usize> {
+    async fn write_mc_varint(self: &mut Pin<&mut Self>, value: i32) -> io::Result<usize> {
         VarInt::write_to_async(self, value).await
+    }
+
+    async fn write_mc_string(self: &mut Pin<&mut Self>, value: &str) -> io::Result<usize> {
+        McString::write_to_async(self, value).await
+    }
+
+    async fn write_mc_identifier(
+        self: &mut Pin<&mut Self>,
+        value: &McIdentifier,
+    ) -> io::Result<usize> {
+        let string = value.to_string();
+        McString::write_to_async(self, &string).await
+    }
+
+    async fn write_mc_uuid(self: &mut Pin<&mut Self>, value: &McUUID) -> io::Result<usize> {
+        McUUID::write_to_async(self, value).await
     }
 }
 

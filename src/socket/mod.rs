@@ -14,10 +14,6 @@ pub trait Middleware<S: AsyncRead + AsyncWrite> {
     async fn read_packet(&self, reader: &mut Pin<&mut S>, buf: &mut [u8]) -> tokio::io::Result<()>;
 }
 
-type CompressionMiddleware<S> = dyn Middleware<S>;
-
-type EncryptionMiddleware<S> = dyn Middleware<S>;
-
 pub struct McSocket<'a, S: AsyncWrite + AsyncRead, C: Middleware<S>, E: Middleware<S>> {
     socket: &'a S,
     compressor: C,

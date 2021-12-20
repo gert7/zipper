@@ -3,7 +3,7 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
-use super::{CompressionMiddleware, Middleware};
+use super::{Middleware};
 use crate::mc_types::ext::{McAsyncReadExt, McAsyncWriteExt};
 
 /// Prepends the length of the data in front of the data before writing.
@@ -28,7 +28,7 @@ where
     }
 
     async fn read_packet(&self, reader: &mut Pin<&mut S>, buf: &mut [u8]) -> tokio::io::Result<()> {
-        let length = reader.read_mc_varint().await.unwrap();
+        let length = reader.read_mc_varint().await?;
 
         let mut handle = reader.take(length as u64);
         handle.read(buf).await?;
@@ -68,8 +68,7 @@ mod tests {
     fn test_write() {
         let input = vec![0x01 as u8, 0x11, 0x22, 0x33];
 
-        let output = Vec::new();
-        let mut output = Cursor::new(output);
+        let mut output = Cursor::new(Vec::new());
 
         let mw = McNoCompression;
 
