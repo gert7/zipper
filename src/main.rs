@@ -5,9 +5,11 @@ extern crate lazy_static;
 mod mc_types;
 mod packet;
 mod socket;
+mod world;
 
 use lazy_static::lazy_static;
 use mc_types::McIdentifier;
+use nbt::Blob;
 use rand::prelude::*;
 use std::{
     fs::{read_to_string, File},
