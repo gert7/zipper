@@ -70,6 +70,17 @@ pub trait McReadExt: io::Read {
     {
         Ok(McUUID::read_from(self)?)
     }
+
+    fn read_mc_nbt(&mut self) -> Result<nbt::Value, io::Error>
+    where
+        Self: Sized,
+    {
+        let nbt = nbt::Value::from_reader(0x0a, self);
+        match nbt {
+            Ok(v) => Ok(v),
+            Err(e) => panic!("{}", e),
+        }
+    }
 }
 
 impl<R: io::Read + ?Sized> McReadExt for R {}
@@ -147,6 +158,14 @@ pub trait McWriteExt: io::Write {
         Self: Sized,
     {
         McUUID::write_to(self, value)
+    }
+
+    fn write_mc_nbt(&mut self, value: &nbt::Value) -> io::Result<usize>
+    where
+        Self: Sized,
+    {
+        value.to_writer(self)?;
+        Ok(value.len_bytes())
     }
 }
 

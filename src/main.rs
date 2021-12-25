@@ -81,6 +81,8 @@ fn prepare_login_success(buf: &mut impl Write) -> io::Result<usize> {
 }
 
 fn prepare_join_game(buf: &mut impl Write) -> io::Result<usize> {
+    let mut f = File::create("nbt.txt").unwrap();
+
     let mut count = 0;
     // player Entity ID
     count += buf.write_mc_int(24)?;
@@ -94,8 +96,10 @@ fn prepare_join_game(buf: &mut impl Write) -> io::Result<usize> {
         name: "steveland".to_owned(),
     };
     count += buf.write_mc_identifier(&world_id)?; // world names
-    count += buf.write_mc_ubyte(0)?;
-    count += buf.write_mc_ubyte(0)?;
+    count += buf.write_mc_nbt(&world::dimensions::DEFAULT_DIMENSION_CODEC)?;
+    f.write_mc_nbt(&world::dimensions::DEFAULT_DIMENSION_CODEC)?;
+    count += buf.write_mc_nbt(&world::dimensions::DEFAULT_DIMENSION_TYPE)?;
+    f.write_mc_nbt(&world::dimensions::DEFAULT_DIMENSION_TYPE)?;
     count += buf.write_mc_identifier(&world_id)?; // world name
     count += buf.write_mc_long(56717237888581)?; // hashed seed
     count += buf.write_mc_varint(32)?; // max players
